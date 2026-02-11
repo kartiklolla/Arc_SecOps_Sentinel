@@ -1,280 +1,308 @@
+"""
+CyberStrike Console - Elite Hacker Command & Control Dashboard
+Main application entry point.
+"""
+
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical, Horizontal
-from textual.widgets import Button, Header, Footer, Log, Static, Label
+from textual.widgets import Button, Footer, Log, Static, Label
 from textual.binding import Binding
-from rich.text import Text
-import time
-import random
+from textual import work
+from textual.worker import get_current_worker
 
-# --- CONFIGURATION ---
-# The logs your Agent is watching. 
-# Ensure these match the paths in your Agent's code!
-AUTH_LOG_PATH = "../shared_logs/auth.log"
-ACCESS_LOG_PATH = "../shared_logs/access.log"
+from widgets import (
+    PacketGraph,
+    PacketStream,
+    HexViewer,
+    ProgressIndicator,
+    SystemInfo,
+    StatusBar
+)
+from attacks import AttackRunner
 
-# --- CONFIGURATION ---
-# The logs your Agent is watching. 
-AUTH_LOG_PATH = "../shared_logs/auth.log"
-ACCESS_LOG_PATH = "../shared_logs/access.log"
 
-class PacketVisualizer(Static):
-    """A widget to visualize network packets and payloads in real-time."""
-    
-    def on_mount(self) -> None:
-        self.update("")
-
-    def show_packet(self, src: str, dst: str, protocol: str, payload_hex: str) -> None:
-        """Render a packet with a hex dump view."""
-        timestamp = time.strftime("%H:%M:%S.%f")[:-3]
-        
-        # Create a hex dump representation
-        hex_view = ""
-        chars = ""
-        for i in range(0, len(payload_hex), 2):
-            byte = payload_hex[i:i+2]
-            hex_view += f"[bold red]{byte}[/] "
-            try:
-                char = bytes.fromhex(byte).decode('utf-8')
-                if not char.isprintable():
-                    char = "."
-            except:
-                char = "."
-            chars += f"[red]{char}[/]"
-            
-            if (i // 2 + 1) % 8 == 0:
-                hex_view += "  "
-                
-        panel = f"""
-[bold white]CAPTURED PACKET[/]  [dim]{timestamp}[/]
-[bold cyan]SRC:[/] {src}  [bold cyan]DST:[/] {dst}  [bold yellow]PROTO:[/] {protocol}
-[rule]
-[bold red]{hex_view:<40}[/]  [white]│[/]  [red]{chars}[/]
+# ASCII Banner
+BANNER = """
+ ██████╗██╗   ██╗██████╗ ███████╗██████╗ ███████╗████████╗██████╗ ██╗██╗  ██╗███████╗
+██╔════╝╚██╗ ██╔╝██╔══██╗██╔════╝██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██║██║ ██╔╝██╔════╝
+██║      ╚████╔╝ ██████╔╝█████╗  ██████╔╝███████╗   ██║   ██████╔╝██║█████╔╝ █████╗  
+██║       ╚██╔╝  ██╔══██╗██╔══╝  ██╔══██╗╚════██║   ██║   ██╔══██╗██║██╔═██╗ ██╔══╝  
+╚██████╗   ██║   ██████╔╝███████╗██║  ██║███████║   ██║   ██║  ██║██║██║  ██╗███████╗
+ ╚═════╝   ╚═╝   ╚═════╝ ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚══════╝
 """
-        self.update(panel)
 
-class VillainConsole(App):
+
+class CyberStrikeConsole(App):
     """The Attacker Command & Control Dashboard."""
     
     CSS = """
     Screen {
-        background: #0d0d0d;
-        color: #ff0000;
+        background: #0a0a0a;
+        color: #ff0040;
     }
     
-    #header {
-        background: #200;
-        color: #ff0000;
+    /* Header Section */
+    #header_section {
+        height: 8;
+        width: 100%;
+        background: #0a0a0a;
+        border-bottom: heavy #ff0040;
+    }
+    
+    #banner {
+        color: #ff0040;
         text-align: center;
+        height: 6;
+    }
+    
+    /* Main Layout */
+    #main_container {
+        height: 100%;
+        width: 100%;
+        layout: horizontal;
+    }
+    
+    /* Left Panel - Controls */
+    #left_panel {
+        width: 20;
+        height: 100%;
+        border-right: heavy #ff0040;
+        background: #0d0d0d;
+        padding: 1;
+    }
+    
+    #attack_label {
+        text-align: center;
+        color: #ff0040;
         text-style: bold;
-        height: 3;
-        content-align: center middle;
-        border-bottom: double #ff0000;
+        background: #1a0000;
+        margin-bottom: 1;
+        padding: 0 1;
     }
-
-    Container {
-        padding: 0;
-    }
-
-    #main_layout {
-        height: 100%;
-        width: 100%;
-    }
-
-    #controls {
-        width: 25%;
-        height: 100%;
-        dock: left;
-        border-right: heavy #ff0000;
-        background: #100;
-        padding: 1;
-    }
-
-    #right_panel {
-        width: 75%;
-        height: 100%;
-        layout: vertical;
-    }
-
-    #terminal {
-        height: 70%;
-        width: 100%;
-        background: #000;
-        border-bottom: heavy #ff0000;
-        padding: 1;
-    }
-
-    #visualizer {
-        height: 30%;
-        width: 100%;
-        background: #080000;
-        border: solid #400;
-        padding: 1;
-    }
-
+    
     Button {
         width: 100%;
         margin-bottom: 1;
-        background: #300;
-        color: #ff0000;
-        border: wide #ff0000;
+        background: #1a0000;
+        color: #ff0040;
+        border: tall #ff0040;
         text-style: bold;
     }
-
+    
     Button:hover {
-        background: #ff0000;
-        color: #fff;
+        background: #ff0040;
+        color: #000;
     }
     
-    .title {
-        text-align: center;
-        color: #ff0000;
-        text-style: bold underline;
-        margin-bottom: 1;
-        padding-top: 1;
+    Button:focus {
+        background: #330000;
+        border: tall #ff3366;
     }
-
+    
+    /* Center Panel - Log + Hex */
+    #center_panel {
+        width: 1fr;
+        height: 100%;
+        padding: 0 1;
+    }
+    
+    #log_container {
+        height: 50%;
+        background: #050505;
+        border: solid #330000;
+        padding: 1;
+    }
+    
+    #log_label {
+        color: #ff0040;
+        text-style: bold;
+        text-align: center;
+        background: #1a0000;
+        margin-bottom: 1;
+    }
+    
     Log {
-        background: #000;
-        color: #ff0000;
-        scrollbar-color: #ff0000;
+        background: #050505;
+        color: #ff0040;
+        scrollbar-color: #ff0040;
+        scrollbar-background: #0a0a0a;
+    }
+    
+    #hex_container {
+        height: 25%;
+        background: #050505;
+        border: solid #330000;
+        padding: 1;
+    }
+    
+    #progress_container {
+        height: 25%;
+        background: #050505;
+        border: solid #330000;
+        padding: 1;
+    }
+    
+    /* Right Panel - Packet Visualization */
+    #right_panel {
+        width: 55;
+        height: 100%;
+        border-left: heavy #ff0040;
+        background: #0d0d0d;
+        padding: 1;
+    }
+    
+    #packet_stream_container {
+        height: 40%;
+        background: #050505;
+        border: solid #330000;
+        padding: 1;
+    }
+    
+    #graph_container {
+        height: 60%;
+        background: #050505;
+        border: solid #330000;
+        padding: 1;
+    }
+    
+    Footer {
+        background: #1a0000;
+        color: #ff0040;
+    }
+    
+    /* Widget styling */
+    SystemInfo {
+        margin-top: 1;
     }
     """
 
     BINDINGS = [
-        Binding("q", "quit", "Quit Console"),
-        Binding("c", "clear_log", "Clear Terminal"),
+        Binding("q", "quit", "Quit"),
+        Binding("c", "clear_log", "Clear"),
+        Binding("1", "attack_ssh", "SSH"),
+        Binding("2", "attack_sql", "SQLi"),
+        Binding("3", "attack_ddos", "DDoS"),
+        Binding("4", "attack_scan", "Scan"),
     ]
 
     def compose(self) -> ComposeResult:
-        yield Static("█▀ █▄█ ▀█▀ █▀▀ █ █ █ █ █ █\nSYSTEM STATUS: ONLINE | ENCRYPTION: AES-256", id="header")
+        """Build the UI layout."""
         
-        with Container(id="main_layout"):
-            # Left Panel: Attack Buttons
-            with Vertical(id="controls"):
-                yield Label(":: ATTACK VECTORS ::", classes="title")
-                yield Button("SSH BRUTE FORCE", id="btn_ssh")
-                yield Button("SQL INJECTION", id="btn_sql")
-                yield Button("DDOS FLOOD", id="btn_ddos")
-                yield Button("PORT SCAN (NMAP)", id="btn_nmap")
-                yield Static("\n[dim]Connected to C2 Node\nLatency: 12ms\nVPN: ACTIVED[/]", markup=True)
+        # Header with banner
+        with Vertical(id="header_section"):
+            yield Static(BANNER, id="banner")
+            yield StatusBar()
+        
+        # Main content area
+        with Container(id="main_container"):
             
-            # Right Panel: Terminal + Visuals
-            with Vertical(id="right_panel"):
-                with Vertical(id="terminal"):
-                    yield Label(">> SYSTEM LOGS", classes="title")
-                    # markup=True fixes the issue where color tags are printed literally
-                    yield Log(id="log_output", highlight=True)
+            # Left Panel - Attack Controls
+            with Vertical(id="left_panel"):
+                yield Label("╔═ ATTACKS ═╗", id="attack_label")
+                yield Button("SSH Brute [1]", id="btn_ssh")
+                yield Button("SQL Inject [2]", id="btn_sql")
+                yield Button("DDoS Flood [3]", id="btn_ddos")
+                yield Button("Port Scan [4]", id="btn_scan")
+                yield SystemInfo()
+            
+            # Center Panel - Command Output
+            with Vertical(id="center_panel"):
+                with Vertical(id="log_container"):
+                    yield Label("OUTPUT", id="log_label")
+                    yield Log(id="log_output", highlight=True, max_lines=200)
                 
-                with Vertical(id="visualizer"):
-                    yield Label(">> PACKET SNIFFER", classes="title")
-                    yield PacketVisualizer(id="packet_viz")
-
+                with Vertical(id="hex_container"):
+                    yield HexViewer(id="hex_viewer")
+                
+                with Vertical(id="progress_container"):
+                    yield ProgressIndicator(id="progress")
+            
+            # Right Panel - Packet Visualization
+            with Vertical(id="right_panel"):
+                with Vertical(id="packet_stream_container"):
+                    yield PacketStream(id="packet_stream")
+                
+                with Vertical(id="graph_container"):
+                    yield PacketGraph(id="packet_graph")
+        
         yield Footer()
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button clicks and simulate attacks."""
+    def on_mount(self) -> None:
+        """Initialize on startup."""
         log = self.query_one("#log_output", Log)
-        viz = self.query_one("#packet_viz", PacketVisualizer)
+        log.write_line("[dim white]Console initialized. Select an attack vector to begin.[/]")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button clicks."""
+        button_id = event.button.id
         
-        if event.button.id == "btn_ssh":
-            self.run_ssh_attack(log, viz)
-        elif event.button.id == "btn_sql":
-            self.run_sql_injection(log, viz)
-        elif event.button.id == "btn_ddos":
-            self.run_ddos(log, viz)
-        elif event.button.id == "btn_nmap":
-            self.run_port_scan(log, viz)
+        if button_id == "btn_ssh":
+            self.action_attack_ssh()
+        elif button_id == "btn_sql":
+            self.action_attack_sql()
+        elif button_id == "btn_ddos":
+            self.action_attack_ddos()
+        elif button_id == "btn_scan":
+            self.action_attack_scan()
 
-    # --- ATTACK SIMULATIONS ---
+    def _get_attack_runner(self) -> AttackRunner:
+        """Create an attack runner with current widget references."""
+        return AttackRunner(
+            log=self.query_one("#log_output", Log),
+            hex_viewer=self.query_one("#hex_viewer", HexViewer),
+            packet_stream=self.query_one("#packet_stream", PacketStream),
+            packet_graph=self.query_one("#packet_graph", PacketGraph),
+            progress=self.query_one("#progress", ProgressIndicator)
+        )
 
-    def run_ssh_attack(self, log: Log, viz: PacketVisualizer):
-        log.write_line(Text.from_markup("[bold red]>> INITIATING SSH BRUTE FORCE ATTACK...[/]"))
-        target_ip = "192.168.1.105"
-        passwords = ["123456", "password", "admin", "toor", "root", "qwerty"]
-        
-        try:
-            with open(AUTH_LOG_PATH, "a") as f:
-                for i in range(1, 15):
-                    timestamp = time.strftime("%b %d %H:%M:%S")
-                    pwd = random.choice(passwords)
-                    
-                    # Visualize Payload
-                    payload = f"USER=root&PASS={pwd}"
-                    hex_payload = payload.encode('utf-8').hex()
-                    viz.show_packet("10.0.0.66", target_ip, "SSHv2", hex_payload)
-                    
-                    # Log Entry
-                    entry = f"{timestamp} server sshd[{random.randint(1000,9999)}]: Failed password for root from {target_ip} port {random.randint(30000,60000)} ssh2\n"
-                    f.write(entry)
-                    
-                    log.write_line(Text.from_markup(f"   [red]Trying root:{pwd:<10}... [bold red]FAILED[/][/]"))
-                    time.sleep(0.15) 
-            
-            log.write_line(Text.from_markup(f"[bold green]>> ATTACK COMPLETE. Payloads sent to {target_ip}[/]"))
-        except FileNotFoundError:
-            log.write_line(Text.from_markup(f"[bold yellow]ERROR: Could not find {AUTH_LOG_PATH}.[/]"))
+    # --- ATTACK ACTIONS ---
 
-    def run_sql_injection(self, log: Log, viz: PacketVisualizer):
-        log.write_line(Text.from_markup("[bold yellow]>> INJECTING SQL PAYLOADS INTO WEB PORTAL...[/]"))
-        payloads = ["' OR '1'='1", "UNION SELECT * FROM users", "DROP TABLE users;--", "admin' --"]
-        
-        try:
-            with open(ACCESS_LOG_PATH, "a") as f:
-                for payload in payloads:
-                    timestamp = time.strftime("%d/%b/%Y:%H:%M:%S +0000")
-                    
-                    # Visualize Payload
-                    http_payload = f"GET /login?u={payload} HTTP/1.1"
-                    hex_p = http_payload.encode('utf-8').hex()
-                    viz.show_packet("10.0.0.66", "192.168.1.105", "HTTP", hex_p)
+    def action_attack_ssh(self) -> None:
+        """Launch SSH brute force attack."""
+        self._run_ssh_attack()
 
-                    entry = f'192.168.1.105 - - [{timestamp}] "GET /login.php?user={payload} HTTP/1.1" 403 0 "-" "Mozilla/5.0"\n'
-                    f.write(entry)
-                    log.write_line(Text.from_markup(f"   [yellow]Payload sent: {payload}[/]"))
-                    time.sleep(0.5)
-            log.write_line(Text.from_markup("[bold green]>> INJECTION BATCH COMPLETE.[/]"))
-        except FileNotFoundError:
-            log.write_line(Text.from_markup(f"[bold yellow]ERROR: Could not find {ACCESS_LOG_PATH}.[/]"))
+    def action_attack_sql(self) -> None:
+        """Launch SQL injection attack."""
+        self._run_sql_attack()
 
-    def run_ddos(self, log: Log, viz: PacketVisualizer):
-        log.write_line(Text.from_markup("[bold cyan]>> LAUNCHING LOIC DDOS FLOOD...[/]"))
-        viz.update("[bold red blink]!!! FLOODING TARGET !!![/]\n[white]Packets/sec: 10,000[/]")
-        
-        try:
-            with open(ACCESS_LOG_PATH, "a") as f:
-                # Batch write for speed
-                chunk = ""
-                for _ in range(50):
-                    chunk += f'192.168.1.105 - - [01/Jan/2026:00:00:00] "GET / HTTP/1.1" 200 1024\n'
-                
-                for _ in range(10): # 10 chunks
-                    f.write(chunk)
-                    log.write_line(Text.from_markup(f"   [cyan]Sending 500 packets...[/]"))
-                    time.sleep(0.05)
-                    
-            log.write_line(Text.from_markup("[bold green]>> TARGET SATURATED.[/]"))
-            viz.update("[bold green]TARGET DOWN[/]")
-        except Exception as e:
-            log.write(str(e))
+    def action_attack_ddos(self) -> None:
+        """Launch DDoS flood attack."""
+        self._run_ddos_attack()
 
-    def run_port_scan(self, log: Log, viz: PacketVisualizer):
-        log.write_line(Text.from_markup("[bold magenta]>> MAPPING NETWORK TOPOLOGY...[/]"))
-        viz.update("[bold magenta]SCANNING PORTS 1-1000...[/]")
-        
-        open_ports = [22, 80, 443, 3306]
-        for port in [21, 22, 23, 80, 443, 3306, 8080]:
-            status = "OPEN" if port in open_ports else "CLOSED"
-            color = "green" if status == "OPEN" else "red"
-            
-            viz.show_packet("10.0.0.66", "192.168.1.105", "TCP/SYN", f"PORT={port}")
-            log.write_line(Text.from_markup(f"   [{color}]Port {port:<5} : {status}[/]"))
-            time.sleep(0.2)
-        
-        log.write_line(Text.from_markup("[bold green]>> SCAN COMPLETE[/]"))
+    def action_attack_scan(self) -> None:
+        """Launch port scan."""
+        self._run_port_scan()
 
-    def action_clear_log(self):
+    @work(exclusive=True, thread=True)
+    def _run_ssh_attack(self) -> None:
+        """Worker for SSH attack."""
+        runner = self._get_attack_runner()
+        runner.run_ssh_bruteforce(self.call_from_thread)
+
+    @work(exclusive=True, thread=True)
+    def _run_sql_attack(self) -> None:
+        """Worker for SQL injection attack."""
+        runner = self._get_attack_runner()
+        runner.run_sql_injection(self.call_from_thread)
+
+    @work(exclusive=True, thread=True)
+    def _run_ddos_attack(self) -> None:
+        """Worker for DDoS attack."""
+        runner = self._get_attack_runner()
+        runner.run_ddos_flood(self.call_from_thread)
+
+    @work(exclusive=True, thread=True)
+    def _run_port_scan(self) -> None:
+        """Worker for port scan."""
+        runner = self._get_attack_runner()
+        runner.run_port_scan(self.call_from_thread)
+
+    def action_clear_log(self) -> None:
+        """Clear the command output log."""
         self.query_one("#log_output", Log).clear()
+        self.query_one("#packet_graph", PacketGraph).reset()
+
 
 if __name__ == "__main__":
-    app = VillainConsole()
+    app = CyberStrikeConsole()
     app.run()
