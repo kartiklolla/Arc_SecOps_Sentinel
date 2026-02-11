@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  archestra-platform:
+    image: archestra/platform
+    container_name: archestra-ai
+    ports:
+      - "3000:3000"      # Frontend UI
+      - "9000:9000"      # Backend API
+    volumes:
+      - ../shared_logs:/logs:ro    # Mount logs as read-only
+      - ./config:/config             # Configuration files
+      - ./data:/data                 # Persistent data storage
+    environment:
+      - LOG_PATHS=/logs/access.log,/logs/auth.log
+      - DETECTION_MODE=realtime
+      - ALERT_THRESHOLD=medium
+      - TZ=UTC
+    restart: unless-stopped
+    networks:
+      - secops-net
+
+networks:
+  secops-net:
+    driver: bridge
