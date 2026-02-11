@@ -1,0 +1,23 @@
+# archestra-config/policies/pii_redaction.yaml
+# Policy: Redact sensitive information before sending to LLM
+apiVersion: archestra.io/v1alpha1
+kind: Policy
+metadata:
+  name: redact-sensitive-data
+spec:
+  type: prompt_input  # Runs BEFORE data hits the LLM
+  rules:
+    - name: mask-usernames
+      pattern: "user\\s+'([a-zA-Z0-9_-]+)'"
+      replacement: "user '[REDACTED_USER]'"
+      action: mask
+    - name: mask-passwords
+      pattern: "password[=:\\s]+([^\\s]+)"
+      replacement: "password=[REDACTED_PASS]"
+      action: mask
+    - name: mask-private-ips
+      # Don't expose internal network IPs to LLM if needed
+      pattern: "10\\.\\d+\\.\\d+\\.\\d+"
+      replacement: "[INTERNAL_IP]"
+      action: mask
+      enabled: false  # Set to true if you want to hide internal IPs

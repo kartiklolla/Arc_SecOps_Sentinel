@@ -1,0 +1,7 @@
+# Policy: Require human approval before blocking any IP address
+policies:
+  - rule_name: "Prevent Unauthorized IP Blocking"
+    target_tool: "firewall_block_ip"
+    condition: "always"
+    action: "require_human_approval"
+    message: "Blocking an IP is a high-risk action. Please confirm."

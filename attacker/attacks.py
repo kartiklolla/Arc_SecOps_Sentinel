@@ -77,7 +77,7 @@ class AttackRunner:
                     call_from_thread(self.packet_graph.add_data, packets)
                     
                     # Write to log file
-                    entry = f"{timestamp} server sshd[{random.randint(1000,9999)}]: Failed password for {user} from {TARGET_IP} port {port} ssh2\n"
+                    entry = f"{timestamp} server sshd[{random.randint(1000,9999)}]: Failed password for {user} from {ATTACKER_IP} port {port} ssh2\n"
                     f.write(entry)
                     f.flush()
                     
@@ -128,7 +128,7 @@ class AttackRunner:
                     call_from_thread(self.packet_graph.add_data, random.randint(100, 300))
                     
                     # Write to log
-                    entry = f'{TARGET_IP} - - [{timestamp}] "POST /login.php HTTP/1.1" 500 0 "-" "SQLMap/1.6"\n'
+                    entry = f'{ATTACKER_IP} - - [{timestamp}] "POST /login.php HTTP/1.1" 500 0 "-" "SQLMap/1.6"\n'
                     f.write(entry)
                     f.flush()
                     
@@ -188,7 +188,8 @@ class AttackRunner:
                     
                     # Write log entries
                     for _ in range(50):
-                        f.write(f'{TARGET_IP} - - [{time.strftime("%d/%b/%Y:%H:%M:%S")}] "GET / HTTP/1.1" 200 1024\n')
+                        rand_src = f"{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}"
+                        f.write(f'{rand_src} - - [{time.strftime("%d/%b/%Y:%H:%M:%S")}] "GET / HTTP/1.1" 200 1024\n')
                     f.flush()
                     
                     botnet_nodes = random.randint(100, 500)

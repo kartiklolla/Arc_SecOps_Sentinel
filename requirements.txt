@@ -1,0 +1,12 @@
+# --- The Villain (Attacker Console) ---
+textual>=0.75.0      # The TUI framework for the Matrix-style dashboard
+rich>=13.0.0         # For beautiful terminal formatting (logs/colors)
+
+# --- The Hero (SecOps Agent) ---
+mcp>=1.0.0           # The official Model Context Protocol SDK
+uvicorn>=0.20.0      # ASGI server to run your MCP agent (if using HTTP)
+httpx>=0.25.0        # HTTP client for making network requests (optional but recommended)
+
+# --- Utilities ---
+python-dotenv        # To load environment variables (API keys/Policies)
+watchdog             # (Optional) Useful for auto-reloading during development
