@@ -4,7 +4,7 @@ Attack simulation logic for the CyberStrike Console.
 
 import time
 import random
-from textual.widgets import Log
+from textual.widgets import RichLog
 
 from config import (
     AUTH_LOG_PATH, ACCESS_LOG_PATH,
@@ -17,7 +17,7 @@ from config import (
 class AttackRunner:
     """Handles attack execution with visualization callbacks."""
     
-    def __init__(self, log: Log, hex_viewer, packet_stream, packet_graph, progress):
+    def __init__(self, log: RichLog, hex_viewer, packet_stream, packet_graph, progress):
         self.log = log
         self.hex_viewer = hex_viewer
         self.packet_stream = packet_stream
@@ -31,15 +31,15 @@ class AttackRunner:
     
     def _log_header(self, title: str, color: str = "red"):
         """Log a styled header."""
-        self.log.write_line(f"[bold {color}]╔══════════════════════════════════════════════════════════╗[/]")
-        self.log.write_line(f"[bold {color}]║  {title:<56}║[/]")
-        self.log.write_line(f"[bold {color}]╚══════════════════════════════════════════════════════════╝[/]")
+        self.log.write(f"[bold {color}]╔══════════════════════════════════════════════════════════╗[/]")
+        self.log.write(f"[bold {color}]║  {title:<56}║[/]")
+        self.log.write(f"[bold {color}]╚══════════════════════════════════════════════════════════╝[/]")
     
     def _log_footer(self, message: str, color: str = "green"):
         """Log a styled footer."""
-        self.log.write_line(f"[bold {color}]╔══════════════════════════════════════════════════════════╗[/]")
-        self.log.write_line(f"[bold {color}]║  {message:<56}║[/]")
-        self.log.write_line(f"[bold {color}]╚══════════════════════════════════════════════════════════╝[/]")
+        self.log.write(f"[bold {color}]╔══════════════════════════════════════════════════════════╗[/]")
+        self.log.write(f"[bold {color}]║  {message:<56}║[/]")
+        self.log.write(f"[bold {color}]╚══════════════════════════════════════════════════════════╝[/]")
     
     def run_ssh_bruteforce(self, call_from_thread):
         """Execute SSH brute force attack."""
@@ -83,7 +83,7 @@ class AttackRunner:
                     
                     # Console output
                     call_from_thread(
-                        self.log.write_line,
+                        self.log.write,
                         f"   [cyan]#{i:03}[/] [dim]Trying[/] [yellow]{user}[/]:[red]{pwd:<12}[/] [bold red]✗ FAILED[/]"
                     )
                     
@@ -94,7 +94,7 @@ class AttackRunner:
             
         except FileNotFoundError:
             call_from_thread(
-                self.log.write_line,
+                self.log.write,
                 f"[bold red]⚠ ERROR: {AUTH_LOG_PATH} not found[/]"
             )
             call_from_thread(self.progress.complete)
@@ -135,7 +135,7 @@ class AttackRunner:
                     status = random.choice(["[red]500 ERROR[/]", "[yellow]403 FORBIDDEN[/]", "[cyan]200 OK[/]"])
                     display_payload = payload[:35] + "..." if len(payload) > 35 else payload
                     call_from_thread(
-                        self.log.write_line,
+                        self.log.write,
                         f"   [cyan]#{i:02}[/] [dim]Injecting:[/] [yellow]{display_payload}[/] {status}"
                     )
                     
@@ -146,7 +146,7 @@ class AttackRunner:
             
         except FileNotFoundError:
             call_from_thread(
-                self.log.write_line,
+                self.log.write,
                 f"[bold red]⚠ ERROR: {ACCESS_LOG_PATH} not found[/]"
             )
             call_from_thread(self.progress.complete)
@@ -194,7 +194,7 @@ class AttackRunner:
                     
                     botnet_nodes = random.randint(100, 500)
                     call_from_thread(
-                        self.log.write_line,
+                        self.log.write,
                         f"   [red]WAVE {wave:02}/{total_waves}[/] │ [cyan]Packets:[/] [bright_red]{packets_per_wave:,}[/] │ [yellow]Botnet: {botnet_nodes}[/]"
                     )
                     
@@ -205,7 +205,7 @@ class AttackRunner:
             
         except Exception as e:
             call_from_thread(
-                self.log.write_line,
+                self.log.write,
                 f"[bold red]⚠ ERROR: {str(e)}[/]"
             )
             call_from_thread(self.progress.complete)
@@ -242,12 +242,12 @@ class AttackRunner:
             # Log result
             if is_open:
                 call_from_thread(
-                    self.log.write_line,
+                    self.log.write,
                     f"   [bright_green]✓[/] [cyan]{port:>5}/tcp[/] [bright_green]OPEN[/]   [yellow]{service:<12}[/] [dim]{version}[/]"
                 )
             else:
                 call_from_thread(
-                    self.log.write_line,
+                    self.log.write,
                     f"   [red]✗[/] [dim]{port:>5}/tcp[/] [red]CLOSED[/] [dim]{service}[/]"
                 )
             

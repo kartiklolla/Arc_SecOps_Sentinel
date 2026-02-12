@@ -5,7 +5,7 @@ Main application entry point.
 
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical, Horizontal
-from textual.widgets import Button, Footer, Log, Static, Label
+from textual.widgets import Button, Footer, RichLog, Static, Label
 from textual.binding import Binding
 from textual import work
 from textual.worker import get_current_worker
@@ -209,7 +209,7 @@ class CyberStrikeConsole(App):
             with Vertical(id="center_panel"):
                 with Vertical(id="log_container"):
                     yield Label("OUTPUT", id="log_label")
-                    yield Log(id="log_output", highlight=True, max_lines=200)
+                    yield RichLog(id="log_output", highlight=True, max_lines=200, markup=True)
                 
                 with Vertical(id="hex_container"):
                     yield HexViewer(id="hex_viewer")
@@ -229,8 +229,8 @@ class CyberStrikeConsole(App):
 
     def on_mount(self) -> None:
         """Initialize on startup."""
-        log = self.query_one("#log_output", Log)
-        log.write_line("[dim white]Console initialized. Select an attack vector to begin.[/]")
+        log = self.query_one("#log_output", RichLog)
+        log.write("[dim white]Console initialized. Select an attack vector to begin.[/]")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button clicks."""
@@ -248,7 +248,7 @@ class CyberStrikeConsole(App):
     def _get_attack_runner(self) -> AttackRunner:
         """Create an attack runner with current widget references."""
         return AttackRunner(
-            log=self.query_one("#log_output", Log),
+            log=self.query_one("#log_output", RichLog),
             hex_viewer=self.query_one("#hex_viewer", HexViewer),
             packet_stream=self.query_one("#packet_stream", PacketStream),
             packet_graph=self.query_one("#packet_graph", PacketGraph),
@@ -299,7 +299,7 @@ class CyberStrikeConsole(App):
 
     def action_clear_log(self) -> None:
         """Clear the command output log."""
-        self.query_one("#log_output", Log).clear()
+        self.query_one("#log_output", RichLog).clear()
         self.query_one("#packet_graph", PacketGraph).reset()
 
 
