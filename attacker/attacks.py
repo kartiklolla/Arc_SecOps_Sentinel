@@ -2,10 +2,16 @@
 Attack simulation logic for the CyberStrike Console.
 """
 
+import sys
 import time
 import random
+from pathlib import Path
 from textual.widgets import RichLog
 
+# Add shared_logs to path for events module
+sys.path.insert(0, str(Path(__file__).parent.parent / "shared_logs"))
+
+from events import emit_attack, AttackType, Severity
 from config import (
     AUTH_LOG_PATH, ACCESS_LOG_PATH,
     TARGET_IP, ATTACKER_IP,
@@ -81,6 +87,18 @@ class AttackRunner:
                     f.write(entry)
                     f.flush()
                     
+                    # Emit structured event for agent
+                    emit_attack(
+                        attack_type=AttackType.SSH_BRUTE_FORCE,
+                        source_ip=ATTACKER_IP,
+                        dest_ip=TARGET_IP,
+                        dest_port=22,
+                        protocol="SSH",
+                        severity=Severity.HIGH,
+                        payload=payload,
+                        metadata={"username": user, "attempt": i, "source_port": port}
+                    )
+                    
                     # Console output
                     call_from_thread(
                         self.log.write,
@@ -131,6 +149,18 @@ class AttackRunner:
                     entry = f'{ATTACKER_IP} - - [{timestamp}] "POST /login.php HTTP/1.1" 500 0 "-" "SQLMap/1.6"\n'
                     f.write(entry)
                     f.flush()
+                    
+                    # Emit structured event for agent
+                    emit_attack(
+                        attack_type=AttackType.SQL_INJECTION,
+                        source_ip=ATTACKER_IP,
+                        dest_ip=TARGET_IP,
+                        dest_port=80,
+                        protocol="HTTP",
+                        severity=Severity.CRITICAL,
+                        payload=payload,
+                        metadata={"endpoint": "/login.php", "method": "POST", "attempt": i}
+                    )
                     
                     status = random.choice(["[red]500 ERROR[/]", "[yellow]403 FORBIDDEN[/]", "[cyan]200 OK[/]"])
                     display_payload = payload[:35] + "..." if len(payload) > 35 else payload
@@ -186,13 +216,25 @@ class AttackRunner:
                     # Spike the graph
                     call_from_thread(self.packet_graph.add_data, packets_per_wave)
                     
+                    botnet_nodes = random.randint(100, 500)
+                    
                     # Write log entries
                     for _ in range(50):
                         rand_src = f"{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}"
                         f.write(f'{rand_src} - - [{time.strftime("%d/%b/%Y:%H:%M:%S")}] "GET / HTTP/1.1" 200 1024\n')
+                        
+                        # Emit structured event for each DDoS packet
+                        emit_attack(
+                            attack_type=AttackType.DDOS_FLOOD,
+                            source_ip=rand_src,
+                            dest_ip=TARGET_IP,
+                            dest_port=80,
+                            protocol="HTTP",
+                            severity=Severity.CRITICAL,
+                            payload=flood_payload[:100],
+                            metadata={"wave": wave, "packets_in_wave": packets_per_wave, "botnet_nodes": botnet_nodes}
+                        )
                     f.flush()
-                    
-                    botnet_nodes = random.randint(100, 500)
                     call_from_thread(
                         self.log.write,
                         f"   [red]WAVE {wave:02}/{total_waves}[/] │ [cyan]Packets:[/] [bright_red]{packets_per_wave:,}[/] │ [yellow]Botnet: {botnet_nodes}[/]"
@@ -238,6 +280,18 @@ class AttackRunner:
             
             # Graph
             call_from_thread(self.packet_graph.add_data, random.randint(10, 50))
+            
+            # Emit structured event for agent
+            emit_attack(
+                attack_type=AttackType.PORT_SCAN,
+                source_ip=ATTACKER_IP,
+                dest_ip=TARGET_IP,
+                dest_port=port,
+                protocol="TCP",
+                severity=Severity.MEDIUM,
+                payload=syn_payload,
+                metadata={"service": service, "version": version, "is_open": is_open, "scan_type": "SYN"}
+            )
             
             # Log result
             if is_open:

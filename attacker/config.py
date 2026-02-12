@@ -2,9 +2,18 @@
 Configuration settings for the CyberStrike Console.
 """
 
+from pathlib import Path
+
 # --- LOG PATHS ---
-AUTH_LOG_PATH = "../shared_logs/auth.log"
-ACCESS_LOG_PATH = "../shared_logs/access.log"
+BASE_DIR = Path(__file__).parent.parent
+SHARED_LOGS_DIR = BASE_DIR / "shared_logs"
+
+AUTH_LOG_PATH = SHARED_LOGS_DIR / "auth.log"
+ACCESS_LOG_PATH = SHARED_LOGS_DIR / "access.log"
+EVENTS_LOG_PATH = SHARED_LOGS_DIR / "events.jsonl"
+
+# Ensure shared_logs directory exists
+SHARED_LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- COLOR SCHEME (Red/Black Hacker Theme) ---
 COLORS = {

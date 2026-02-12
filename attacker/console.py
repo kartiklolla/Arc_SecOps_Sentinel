@@ -99,6 +99,17 @@ class CyberStrikeConsole(App):
         border: tall #ff3366;
     }
     
+    Button.normal-btn {
+        background: #001a00;
+        color: #00ff00;
+        border: tall #00ff00;
+    }
+    
+    Button.normal-btn:hover {
+        background: #00ff00;
+        color: #000;
+    }
+    
     /* Center Panel - Log + Hex */
     #center_panel {
         width: 1fr;
@@ -203,6 +214,7 @@ class CyberStrikeConsole(App):
                 yield Button("SQL Inject [2]", id="btn_sql")
                 yield Button("DDoS Flood [3]", id="btn_ddos")
                 yield Button("Port Scan [4]", id="btn_scan")
+                yield Button("Normal Traffic [5]", id="btn_normal", classes="normal-btn")
                 yield SystemInfo()
             
             # Center Panel - Command Output
@@ -244,6 +256,8 @@ class CyberStrikeConsole(App):
             self.action_attack_ddos()
         elif button_id == "btn_scan":
             self.action_attack_scan()
+        elif button_id == "btn_normal":
+            self.action_normal_traffic()
 
     def _get_attack_runner(self) -> AttackRunner:
         """Create an attack runner with current widget references."""
@@ -273,6 +287,10 @@ class CyberStrikeConsole(App):
         """Launch port scan."""
         self._run_port_scan()
 
+    def action_normal_traffic(self) -> None:
+        """Generate normal traffic."""
+        self._run_normal_traffic()
+
     @work(exclusive=True, thread=True)
     def _run_ssh_attack(self) -> None:
         """Worker for SSH attack."""
@@ -296,6 +314,35 @@ class CyberStrikeConsole(App):
         """Worker for port scan."""
         runner = self._get_attack_runner()
         runner.run_port_scan(self.call_from_thread)
+
+    @work(exclusive=True, thread=True)
+    def _run_normal_traffic(self) -> None:
+        """Worker for normal traffic generation."""
+        from normal_traffic import run_traffic_generator
+        log = self.query_one("#log_output", RichLog)
+        progress = self.query_one("#progress", ProgressIndicator)
+        packet_graph = self.query_one("#packet_graph", PacketGraph)
+        
+        self.call_from_thread(progress.start, "NORMAL TRAFFIC")
+        self.call_from_thread(log.write, "[bold green]╔══════════════════════════════════════════════════════════╗[/]")
+        self.call_from_thread(log.write, "[bold green]║  GENERATING NORMAL TRAFFIC PATTERNS                      ║[/]")
+        self.call_from_thread(log.write, "[bold green]╚══════════════════════════════════════════════════════════╝[/]")
+        
+        # Generate traffic in bursts with progress updates
+        import time
+        for i in range(10):
+            from normal_traffic import generate_normal_http_traffic, generate_normal_ssh_traffic
+            generate_normal_http_traffic(5)
+            generate_normal_ssh_traffic(2)
+            self.call_from_thread(progress.set_progress, (i + 1) * 10)
+            self.call_from_thread(packet_graph.add_data, 50 + (i * 10))
+            self.call_from_thread(log.write, f"   [green]●[/] Generated batch {i+1}/10 - [cyan]7 events[/]")
+            time.sleep(0.3)
+        
+        self.call_from_thread(progress.complete)
+        self.call_from_thread(log.write, "[bold green]╔══════════════════════════════════════════════════════════╗[/]")
+        self.call_from_thread(log.write, "[bold green]║  ✓ NORMAL TRAFFIC GENERATION COMPLETE - 70 events        ║[/]")
+        self.call_from_thread(log.write, "[bold green]╚══════════════════════════════════════════════════════════╝[/]")
 
     def action_clear_log(self) -> None:
         """Clear the command output log."""

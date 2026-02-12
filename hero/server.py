@@ -3,8 +3,16 @@ import os
 import re
 import httpx
 import json
+import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
+from datetime import datetime, timedelta
+
+# Add shared_logs to path for events module
+BASE_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(BASE_DIR / "shared_logs"))
+
+from events import read_events, get_event_stats, EventType, AttackType
 
 # --- CONFIGURATION ---
 # Define the name of your agent for Archestra
@@ -379,6 +387,195 @@ def system_lockdown(confirm: bool = False) -> str:
         "ALERT: Nginx service stopped. SSH port 22 restricted. System is in panic mode.\n"
         "[ARCHESTRA-APPROVED CRITICAL ACTION]"
     )
+
+
+# --- STRUCTURED EVENT STREAM TOOLS ---
+
+@mcp.tool()
+def get_security_events(
+    limit: int = 50,
+    event_type: Optional[str] = None,
+    attack_type: Optional[str] = None,
+    minutes_ago: Optional[int] = None
+) -> str:
+    """
+    Retrieves structured security events from the event stream.
+    Each event is labeled with its type (normal/attack/suspicious) and includes
+    rich metadata for analysis.
+    
+    Args:
+        limit: Maximum number of events to return (most recent first, default 50)
+        event_type: Filter by type: 'normal', 'attack', or 'suspicious'
+        attack_type: Filter by attack: 'ssh_brute_force', 'sql_injection', 'ddos_flood', 'port_scan'
+        minutes_ago: Only return events from the last N minutes
+    """
+    # Convert string filters to enums if provided
+    evt_type = None
+    if event_type:
+        try:
+            evt_type = EventType(event_type.lower())
+        except ValueError:
+            return f"Invalid event_type '{event_type}'. Use: normal, attack, suspicious"
+    
+    atk_type = None
+    if attack_type:
+        try:
+            atk_type = AttackType(attack_type.lower())
+        except ValueError:
+            return f"Invalid attack_type '{attack_type}'. Use: ssh_brute_force, sql_injection, ddos_flood, port_scan"
+    
+    since = None
+    if minutes_ago:
+        since = datetime.utcnow() - timedelta(minutes=minutes_ago)
+    
+    events = read_events(limit=limit, event_type=evt_type, attack_type=atk_type, since=since)
+    
+    if not events:
+        return "No events found matching the criteria."
+    
+    # Format events for readability
+    output = []
+    for evt in events:
+        net = evt.get('network', {})
+        line = (
+            f"[{evt['timestamp']}] "
+            f"{'🚨 ATTACK' if evt['is_attack'] else '✓ NORMAL'} | "
+            f"{evt.get('attack_type', 'none'):<16} | "
+            f"Severity: {evt['severity']:<8} | "
+            f"{net.get('source_ip', '?')} → {net.get('dest_ip', '?')}:{net.get('dest_port', '?')} ({net.get('protocol', '?')})"
+        )
+        output.append(line)
+    
+    return f"Found {len(events)} events:\n" + "\n".join(output)
+
+
+@mcp.tool()
+def get_event_statistics() -> str:
+    """
+    Returns aggregate statistics about security events including:
+    - Total event counts
+    - Breakdown by event type (normal vs attack)
+    - Breakdown by attack type
+    - Breakdown by severity level
+    - Unique source/destination IPs
+    
+    Use this to get an overview of the security landscape before diving into details.
+    """
+    stats = get_event_stats()
+    
+    if stats['total_events'] == 0:
+        return "No events recorded yet. The event stream is empty."
+    
+    attack_breakdown = "\n".join(
+        f"    - {atk}: {count}" 
+        for atk, count in stats['by_attack_type'].items()
+    ) or "    None detected"
+    
+    return f"""Security Event Statistics:
+═══════════════════════════════════════
+Total Events: {stats['total_events']}
+
+By Event Type:
+    - Normal Traffic: {stats['by_event_type']['normal']}
+    - Attack Traffic: {stats['by_event_type']['attack']}
+    - Suspicious: {stats['by_event_type']['suspicious']}
+
+Attack Type Breakdown:
+{attack_breakdown}
+
+By Severity:
+    - Info: {stats['by_severity']['info']}
+    - Low: {stats['by_severity']['low']}
+    - Medium: {stats['by_severity']['medium']}
+    - High: {stats['by_severity']['high']}
+    - Critical: {stats['by_severity']['critical']}
+
+Unique Source IPs: {len(stats['unique_source_ips'])}
+Unique Destination IPs: {len(stats['unique_dest_ips'])}
+═══════════════════════════════════════"""
+
+
+@mcp.tool()
+def analyze_attack_patterns() -> str:
+    """
+    Provides intelligent analysis of attack events to identify patterns,
+    correlate attacks, and suggest defensive actions.
+    
+    Returns analysis including:
+    - Most frequent attack types
+    - Most active attacker IPs
+    - Attack timeline patterns
+    - Recommended defensive actions
+    """
+    events = read_events(limit=500, event_type=EventType.ATTACK)
+    
+    if not events:
+        return "No attack events detected. System appears secure."
+    
+    # Analyze attack patterns
+    attack_counts = {}
+    source_ip_counts = {}
+    severity_counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
+    
+    for evt in events:
+        # Count by attack type
+        atk = evt.get('attack_type', 'unknown')
+        attack_counts[atk] = attack_counts.get(atk, 0) + 1
+        
+        # Count by source IP
+        src_ip = evt.get('network', {}).get('source_ip', 'unknown')
+        source_ip_counts[src_ip] = source_ip_counts.get(src_ip, 0) + 1
+        
+        # Count by severity
+        sev = evt.get('severity', 'info')
+        if sev in severity_counts:
+            severity_counts[sev] += 1
+    
+    # Generate recommendations
+    recommendations = []
+    
+    # Most active attacker IPs (recommend blocking if > 5 attacks)
+    top_attackers = sorted(source_ip_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+    for ip, count in top_attackers:
+        if count > 5:
+            recommendations.append(f"🚫 BLOCK IP {ip} - {count} attack attempts detected")
+    
+    # Critical attacks need immediate action
+    if severity_counts['critical'] > 0:
+        recommendations.append(f"⚠️ CRITICAL: {severity_counts['critical']} critical-severity attacks detected - investigate immediately")
+    
+    # Specific attack type recommendations
+    if attack_counts.get('ddos_flood', 0) > 10:
+        recommendations.append("🛡️ Enable rate limiting and DDoS protection")
+    if attack_counts.get('sql_injection', 0) > 0:
+        recommendations.append("🔐 Review input validation and WAF rules for SQL injection")
+    if attack_counts.get('ssh_brute_force', 0) > 10:
+        recommendations.append("🔑 Implement fail2ban or SSH key-only authentication")
+    
+    attack_summary = "\n".join(f"    - {atk}: {count}" for atk, count in sorted(attack_counts.items(), key=lambda x: x[1], reverse=True))
+    attacker_summary = "\n".join(f"    - {ip}: {count} attacks" for ip, count in top_attackers)
+    rec_summary = "\n".join(recommendations) if recommendations else "    No immediate actions required"
+    
+    return f"""Attack Pattern Analysis
+═══════════════════════════════════════
+Total Attack Events: {len(events)}
+
+Attack Type Distribution:
+{attack_summary}
+
+Top Attacker IPs:
+{attacker_summary}
+
+Severity Breakdown:
+    - Critical: {severity_counts['critical']}
+    - High: {severity_counts['high']}
+    - Medium: {severity_counts['medium']}
+    - Low: {severity_counts['low']}
+
+RECOMMENDED ACTIONS:
+{rec_summary}
+═══════════════════════════════════════"""
+
 
 if __name__ == "__main__":
     # This starts the server when you run `python hero/server.py`

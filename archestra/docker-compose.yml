@@ -10,7 +10,7 @@ services:
       - ./config:/config             # Configuration files
       - ./data:/data                 # Persistent data storage
     environment:
-      - LOG_PATHS=/logs/access.log,/logs/auth.log
+      - LOG_PATHS=/logs/access.log,/logs/auth.log,/logs/events.jsonl
       - DETECTION_MODE=realtime
       - ALERT_THRESHOLD=medium
       - TZ=UTC
