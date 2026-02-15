@@ -1,0 +1,21 @@
+
+Feb 15 12:52:33 server sshd[7722]: Failed password for ubuntu from 10.0.0.66 port 58411 ssh2
+Feb 15 12:52:33 server sshd[9350]: Failed password for test from 10.0.0.66 port 55899 ssh2
+Feb 15 12:52:33 server sshd[6876]: Failed password for ubuntu from 10.0.0.66 port 53255 ssh2
+Feb 15 12:52:33 server sshd[8210]: Failed password for admin from 10.0.0.66 port 45717 ssh2
+Feb 15 12:52:34 server sshd[8789]: Failed password for root from 10.0.0.66 port 53324 ssh2
+Feb 15 12:52:34 server sshd[9098]: Failed password for user from 10.0.0.66 port 46399 ssh2
+Feb 15 12:52:34 server sshd[8103]: Failed password for user from 10.0.0.66 port 43096 ssh2
+Feb 15 12:52:34 server sshd[3422]: Failed password for root from 10.0.0.66 port 50181 ssh2
+Feb 15 12:52:34 server sshd[2549]: Failed password for admin from 10.0.0.66 port 59387 ssh2
+Feb 15 12:52:35 server sshd[8111]: Failed password for admin from 10.0.0.66 port 56806 ssh2
+Feb 15 12:52:35 server sshd[2988]: Failed password for test from 10.0.0.66 port 47318 ssh2
+Feb 15 12:52:35 server sshd[5104]: Failed password for user from 10.0.0.66 port 52774 ssh2
+Feb 15 12:52:35 server sshd[3457]: Failed password for root from 10.0.0.66 port 58995 ssh2
+Feb 15 12:52:35 server sshd[1948]: Failed password for user from 10.0.0.66 port 56491 ssh2
+Feb 15 12:52:36 server sshd[3923]: Failed password for admin from 10.0.0.66 port 52338 ssh2
+Feb 15 12:52:36 server sshd[5646]: Failed password for admin from 10.0.0.66 port 57477 ssh2
+Feb 15 12:52:36 server sshd[8586]: Failed password for user from 10.0.0.66 port 49342 ssh2
+Feb 15 12:52:36 server sshd[4438]: Failed password for ubuntu from 10.0.0.66 port 56093 ssh2
+Feb 15 12:52:37 server sshd[4365]: Failed password for ubuntu from 10.0.0.66 port 49107 ssh2
+Feb 15 12:52:37 server sshd[1196]: Failed password for user from 10.0.0.66 port 51659 ssh2

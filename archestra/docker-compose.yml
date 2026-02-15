@@ -9,11 +9,18 @@ services:
       - ../shared_logs:/logs:ro    # Mount logs as read-only
       - ./config:/config             # Configuration files
       - ./data:/data                 # Persistent data storage
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - LOG_PATHS=/logs/access.log,/logs/auth.log,/logs/events.jsonl
       - DETECTION_MODE=realtime
       - ALERT_THRESHOLD=medium
       - TZ=UTC
+      - ARCHESTRA_QUICKSTART=true
+      - ARCHESTRA_OLLAMA_ENABLED=true
+      - ARCHESTRA_OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+      - ARCHESTRA_OLLAMA_API_KEY=ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     networks:
       - secops-net

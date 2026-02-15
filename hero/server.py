@@ -7,6 +7,12 @@ import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / ".env"
+print(f"[DEBUG] Loading .env from: {env_path} (exists: {env_path.exists()})")
+load_dotenv(env_path, override=True)
 
 # Add shared_logs to path for events module
 BASE_DIR = Path(__file__).parent.parent
@@ -16,7 +22,8 @@ from events import read_events, get_event_stats, EventType, AttackType
 
 # --- CONFIGURATION ---
 # Define the name of your agent for Archestra
-mcp = FastMCP("SecOps Sentinel")
+# host="0.0.0.0" allows external connections, port 8765 for Archestra integration
+mcp = FastMCP("SecOps Sentinel", host="0.0.0.0", port=8765)
 
 # PATHS: These must match the folder structure we defined.
 # We go up one level (..) to reach the shared_logs folder.
@@ -28,7 +35,12 @@ BLOCKED_IPS_FILE = BASE_DIR / "shared_logs" / "blocked_ips.txt"
 # ARCHESTRA CONFIGURATION
 ARCHESTRA_ENABLED = os.getenv("ARCHESTRA_ENABLED", "true").lower() == "true"
 ARCHESTRA_API_URL = os.getenv("ARCHESTRA_API_URL", "http://localhost:9000")
-ARCHESTRA_API_KEY = os.getenv("ARCHESTRA_API_KEY", "")
+ARCHESTRA_API_KEY = os.getenv("ARCHESTRA_API_KEY", "").strip()
+
+# Debug: Print loaded config (remove in production)
+print(f"[DEBUG] ARCHESTRA_ENABLED: {ARCHESTRA_ENABLED}")
+print(f"[DEBUG] ARCHESTRA_API_URL: {ARCHESTRA_API_URL}")
+print(f"[DEBUG] ARCHESTRA_API_KEY loaded: {'Yes (' + str(len(ARCHESTRA_API_KEY)) + ' chars)' if ARCHESTRA_API_KEY else 'No (empty)'}")
 
 # Ensure the shared_logs directory exists
 BLOCKED_IPS_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -579,4 +591,5 @@ RECOMMENDED ACTIONS:
 
 if __name__ == "__main__":
     # This starts the server when you run `python hero/server.py`
-    mcp.run()
+    # Runs Streamable HTTP server on 0.0.0.0:8765 for Archestra integration
+    mcp.run(transport="streamable-http")
