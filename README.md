@@ -7,19 +7,12 @@
 ![MCP](https://img.shields.io/badge/MCP-1.26.0-green?style=for-the-badge&logo=protocol&logoColor=white)
 ![Compliance](https://img.shields.io/badge/SOC2%20|%20GDPR%20|%20HIPAA-Ready-orange?style=for-the-badge)
 
-### **The Most Comprehensive Archestra Integration You'll See Today**
 
 *Enterprise-grade AI security operations with multi-layered policy governance*
-
-[Why We Win](#-why-arc-secops-sentinel-wins) • [Architecture](#-architecture-deep-dive) • [Policy Engine](#-archestra-policy-engine) • [Quick Start](#-quick-start)
 
 </div>
 
 ---
-
-## 🏆 Why Arc SecOps Sentinel Wins
-
-We didn't just integrate Archestra—we built an **entire defense-in-depth policy architecture** around it. This isn't a demo; it's a **production-ready security operations platform** that proves AI agents can safely perform critical security operations when properly governed.
 
 ### The Challenge We Solved
 
@@ -29,22 +22,6 @@ Our answer: **7 conditional policies, dynamic risk scoring, threat intelligence,
 
 ---
 
-## 📊 Integration Scorecard
-
-| Archestra Feature | Our Implementation | Complexity |
-|-------------------|-------------------|------------|
-| **Conditional Policies** | 7 priority-based rules with compound conditions | ⭐⭐⭐⭐⭐ |
-| **Rate Limiting** | Sliding window per-tool (10/hr, 50/day) | ⭐⭐⭐⭐ |
-| **RBAC** | 4 roles (operator → admin) with granular permissions | ⭐⭐⭐⭐⭐ |
-| **PII Redaction** | 12 patterns (credentials, PII, network data) | ⭐⭐⭐⭐ |
-| **Threat Intelligence** | Dynamic feeds + event stream integration | ⭐⭐⭐⭐⭐ |
-| **Human Approval** | Single approval with timeout and escalation | ⭐⭐⭐⭐ |
-| **Audit Logging** | Complete trail with policy match + risk score | ⭐⭐⭐⭐⭐ |
-| **Fail-Closed Mode** | Denies on unreachable policy engine | ⭐⭐⭐⭐⭐ |
-
----
-
-## 🔥 Key Differentiators
 
 ### 1. Seven Conditional Policies (Not Just "require_approval")
 
@@ -202,7 +179,7 @@ Every single policy decision is logged with forensic detail:
 │  │                    SECOPS SENTINEL (hero/server.py)                       │  │
 │  │                                                                           │  │
 │  │  ┌─────────────────────────────────────────────────────────────────────┐ │  │
-│  │  │                    ArchestraClient (1479 lines)                      │ │  │
+│  │  │                    ArchestraClient                                  │ │  │
 │  │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌───────────────┐  │ │  │
 │  │  │  │ RateLimiter │ │ThreatIntel  │ │ AuditLogger │ │ PolicyCache   │  │ │  │
 │  │  │  │ 10/hr block │ │ Auto-feed   │ │ JSON Trail  │ │ 5min TTL      │  │ │  │
@@ -255,7 +232,7 @@ Every single policy decision is logged with forensic detail:
 | [threat_intel.yaml](archestra/policies/threat_intel.yaml) | Threat feed config | 3 feeds + auto-scoring |
 | [system_lockdown.yaml](archestra/policies/system_lockdown.yaml) | Emergency protocol | Approval + pre-checks |
 
-### ip_block.yaml (252 lines)
+### ip_block.yaml 
 
 ```yaml
 # RATE LIMITING
@@ -280,8 +257,7 @@ rbac:
     - name: admin         # Unrestricted
 ```
 
-### pii_redaction.yaml (159 lines)
-
+### pii_redaction.yaml 
 ```yaml
 # Compliance: GDPR, HIPAA, CCPA, SOC2
 rules:
@@ -304,8 +280,7 @@ rules:
     replacement: "[REDACTED_SSN]"
 ```
 
-### threat_intel.yaml (125 lines)
-
+### threat_intel.yaml 
 ```yaml
 # Dynamic threat feeds
 feeds:
@@ -326,8 +301,7 @@ scoring:
     require_approval: 50 # Score 50-84: Human needed
 ```
 
-### system_lockdown.yaml (83 lines)
-
+### system_lockdown.yaml 
 ```yaml
 # Emergency response protocol
 lockdown:
@@ -486,17 +460,6 @@ python attacker/console.py
 
 ---
 
-## 📈 Why This Wins
-
-### Technical Excellence
-
-- **1,479 lines** of Python implementing advanced policy client
-- **619 lines** of YAML policy definitions
-- **7 conditional policies** with compound expressions
-- **4 RBAC roles** with granular permissions
-- **12 PII patterns** with compliance mapping
-- **Thread-safe** rate limiting and audit logging
-
 ### Archestra Integration Depth
 
 - ✅ Conditional policies (not just require_approval)
@@ -511,22 +474,7 @@ python attacker/console.py
 - ✅ Time-based restrictions
 - ✅ Escalation workflows
 
-### Production Readiness
 
-- Works with real Docker deployment
-- Handles edge cases (unreachable policy engine, malformed input)
-- Thread-safe concurrent operations
-- Comprehensive error handling
-
----
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
 
 **Built for the Archestra Hackathon**
 
