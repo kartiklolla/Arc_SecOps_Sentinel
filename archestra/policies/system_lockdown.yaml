@@ -1,0 +1,75 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ARCHESTRA POLICY: System Lockdown & Emergency Response
+# Emergency protocols for critical system operations
+# ═══════════════════════════════════════════════════════════════════════════════
+apiVersion: archestra.io/v1alpha1
+kind: EmergencyPolicy
+metadata:
+  name: system-lockdown-policy
+  version: "1.0.0"
+  description: "Critical system operations requiring approval"
+  labels:
+    domain: emergency
+    severity: critical
+
+spec:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # LOCKDOWN POLICIES
+  # ─────────────────────────────────────────────────────────────────────────────
+  lockdown:
+    # Single approval requirement
+    approval:
+      type: single
+      required_role: security_lead
+      timeout_seconds: 900  # 15 minutes
+      
+    # Pre-lockdown validations
+    pre_checks:
+      - name: validate_incident_id
+        description: "Ensure incident ticket exists"
+        required: true
+        validation:
+          type: regex
+          pattern: "INC-\\d{6,}"
+          error: "Valid incident ID required (format: INC-XXXXXX)"
+          
+      - name: verify_attack_evidence
+        description: "Verify attack is ongoing"
+        required: true
+        validation:
+          type: expression
+          expression: "recent_attack_count > 0 OR manual_override == true"
+          error: "No recent attacks detected. Use manual_override if certain."
+          
+    # Post-lockdown actions
+    post_actions:
+      - notify_stakeholders:
+          channels: [pagerduty, slack, email]
+          recipients: [security_team, ops_team, leadership]
+          template: "system_lockdown_notification"
+      - create_audit_trail:
+          include: [approval_chain, evidence, timestamp, executor]
+          immutable: true
+      - schedule_review:
+          after_minutes: 30
+          assignee: security_lead
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RATE LIMITING
+  # ─────────────────────────────────────────────────────────────────────────────
+  rate_limits:
+    - window: 86400  # 24 hours
+      max_lockdowns: 1
+      action: deny
+      message: "Only one system lockdown per 24 hours. Requires CISO override."
+      override_role: ciso
+      
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ROLLBACK POLICY
+  # ─────────────────────────────────────────────────────────────────────────────
+  rollback:
+    auto_rollback_enabled: false
+    manual_rollback_approval:
+      required_roles: [security_lead]
+      justification_required: true
+    max_lockdown_duration: 14400  # 4 hours max before review required

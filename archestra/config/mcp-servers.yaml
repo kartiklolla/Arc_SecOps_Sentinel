@@ -1,0 +1,13 @@
+# Archestra MCP Server Registry
+# Servers listed here will appear in the Archestra MCP Server Registry UI
+
+mcp-servers:
+  - name: "SecOps Sentinel"
+    description: "Security Operations MCP server for log analysis and threat detection"
+    url: "http://host.docker.internal:8765/sse"
+    transport: "sse"
+    enabled: true
+    tags:
+      - security
+      - logs
+      - firewall

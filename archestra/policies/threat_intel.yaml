@@ -1,0 +1,124 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ARCHESTRA POLICY: Threat Intelligence Integration
+# Dynamic threat feeds and automated response policies
+# ═══════════════════════════════════════════════════════════════════════════════
+apiVersion: archestra.io/v1alpha1
+kind: ThreatIntelPolicy
+metadata:
+  name: threat-intel-integration
+  version: "1.0.0"
+  description: "Threat intelligence configuration for automated security decisions"
+
+spec:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # THREAT INTELLIGENCE FEEDS
+  # ─────────────────────────────────────────────────────────────────────────────
+  feeds:
+    - name: "internal_blocklist"
+      description: "Organization's internal threat blocklist"
+      type: static
+      source: "/config/internal_blocklist.txt"
+      refresh_interval: 300  # 5 minutes
+      
+    - name: "recent_attackers"
+      description: "IPs that recently attacked this system"
+      type: dynamic
+      source: "events://attack_sources?window=24h&min_attacks=5"
+      refresh_interval: 60  # 1 minute
+      auto_populate: true
+      
+    - name: "emerging_threats"
+      description: "External threat intelligence feed"
+      type: external
+      source: "${THREAT_INTEL_API_URL}"
+      api_key: "${THREAT_INTEL_API_KEY}"
+      refresh_interval: 3600  # 1 hour
+      enabled: false  # Enable when API configured
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # THREAT SCORING CONFIGURATION
+  # ─────────────────────────────────────────────────────────────────────────────
+  scoring:
+    enabled: true
+    
+    # Base scores by attack type
+    attack_type_scores:
+      ssh_brute_force: 30
+      sql_injection: 50
+      ddos_flood: 40
+      port_scan: 15
+      xss: 35
+      path_traversal: 25
+    
+    # Multipliers
+    multipliers:
+      - condition: "attack_count > 10"
+        multiplier: 1.5
+      - condition: "attack_count > 50"
+        multiplier: 2.0
+      - condition: "severity == 'critical'"
+        multiplier: 2.5
+      - condition: "in_threat_feed"
+        multiplier: 1.8
+        
+    # Score thresholds for actions
+    thresholds:
+      auto_block: 85        # Score >= 85: Auto-block (if policy allows)
+      require_approval: 50  # Score 50-84: Require human approval
+      alert_only: 25        # Score 25-49: Alert but no action
+      log_only: 0           # Score < 25: Log only
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # AUTOMATED RESPONSE RULES
+  # ─────────────────────────────────────────────────────────────────────────────
+  automated_responses:
+    - name: "critical_threat_auto_block"
+      description: "Auto-block critical threats with high confidence"
+      condition:
+        type: compound
+        operator: AND
+        conditions:
+          - field: threat_score
+            operator: ">="
+            value: 85
+          - field: confidence
+            operator: ">="
+            value: 0.9
+          - field: is_internal_ip
+            operator: "=="
+            value: false
+      action: auto_block
+      require_audit: true
+      notification:
+        channels: [slack, dashboard]
+        message: "Auto-blocked {ip} (score: {threat_score}, confidence: {confidence})"
+
+    - name: "repeated_attacker_escalation"
+      description: "Escalate repeated attackers"
+      condition:
+        type: expression
+        expression: "attack_count > 20 AND time_since_first_attack < 3600"
+      action: escalate
+      escalation_level: security_lead
+      notification:
+        channels: [pagerduty]
+        urgency: high
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ALLOWLIST CONFIGURATION
+  # ─────────────────────────────────────────────────────────────────────────────
+  allowlists:
+    - name: "trusted_partners"
+      description: "Known partner IPs - never block"
+      ips:
+        - "203.0.113.0/24"  # Partner network
+      action: never_block
+      
+    - name: "internal_infrastructure"
+      description: "Internal servers and services"
+      cidrs:
+        - "10.0.0.0/8"
+        - "172.16.0.0/12"
+        - "192.168.0.0/16"
+      action: never_block
+      alert_on_attack: true  # Alert if internal IP attacks (compromise indicator)

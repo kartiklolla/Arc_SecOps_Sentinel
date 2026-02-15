@@ -1,7 +1,252 @@
-# Policy: Require human approval before blocking any IP address
-policies:
-  - rule_name: "Prevent Unauthorized IP Blocking"
-    target_tool: "firewall_block_ip"
-    condition: "always"
-    action: "require_human_approval"
-    message: "Blocking an IP is a high-risk action. Please confirm."
+# ═══════════════════════════════════════════════════════════════════════════════
+# ARCHESTRA POLICY: IP Blocking Rules
+# Advanced conditional policies with role-based access and rate limiting
+# ═══════════════════════════════════════════════════════════════════════════════
+apiVersion: archestra.io/v1alpha1
+kind: PolicyBundle
+metadata:
+  name: ip-blocking-policies
+  version: "2.0.0"
+  description: "Comprehensive IP blocking policies with conditional logic"
+  labels:
+    domain: security
+    severity: high
+    compliance: [SOC2, GDPR, HIPAA]
+
+spec:
+  # Global settings for this policy bundle
+  settings:
+    fail_mode: closed  # Block if policy engine unavailable
+    audit_all: true    # Log all policy evaluations
+    cache_ttl: 300     # Cache policy decisions for 5 minutes
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RATE LIMITING RULES
+  # ─────────────────────────────────────────────────────────────────────────────
+  rate_limits:
+    - name: "ip_block_hourly_limit"
+      description: "Limit IP blocks to prevent mass blocking attacks"
+      target_tool: "firewall_block_ip"
+      limits:
+        - window: 3600        # 1 hour in seconds
+          max_calls: 10       # Max 10 blocks per hour
+          action: deny
+          message: "Rate limit exceeded: Maximum 10 IP blocks per hour. Contact SOC manager."
+        - window: 86400       # 24 hours
+          max_calls: 50       # Max 50 blocks per day
+          action: require_approval
+          escalation_level: manager
+          message: "Daily block limit approaching. Manager approval required."
+    
+    - name: "lockdown_rate_limit"
+      description: "Severely limit system lockdown calls"
+      target_tool: "system_lockdown"
+      limits:
+        - window: 86400       # 24 hours
+          max_calls: 1        # Only 1 lockdown per day
+          action: deny
+          message: "System lockdown already executed today. Manual override required."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # CONDITIONAL POLICIES
+  # ─────────────────────────────────────────────────────────────────────────────
+  policies:
+    # ──── POLICY 1: Auto-approve known malicious IPs ────
+    - rule_name: "auto_block_known_threats"
+      description: "Auto-approve blocking of IPs in threat intelligence feeds"
+      target_tool: "firewall_block_ip"
+      priority: 100  # Higher priority = evaluated first
+      condition:
+        type: expression
+        expression: |
+          parameters.ip_address in context.threat_intel_blocklist OR
+          parameters.ip_address in context.recent_attackers
+      action: allow
+      audit:
+        level: info
+        message: "Auto-approved: IP {parameters.ip_address} found in threat intelligence"
+      metadata:
+        auto_approved: true
+        requires_review: false
+
+    # ──── POLICY 2: Block internal/protected IPs ────
+    - rule_name: "protect_internal_infrastructure"
+      description: "Never allow blocking of internal infrastructure IPs"
+      target_tool: "firewall_block_ip"
+      priority: 200  # Evaluated before approval rules
+      condition:
+        type: expression
+        expression: |
+          parameters.ip_address.startswith("10.") OR
+          parameters.ip_address.startswith("192.168.1.") OR
+          parameters.ip_address.startswith("172.16.") OR
+          parameters.ip_address in ["127.0.0.1", "0.0.0.0", "localhost"]
+      action: deny
+      message: "DENIED: Cannot block internal/protected IP addresses"
+      audit:
+        level: warning
+        message: "Attempted to block protected IP: {parameters.ip_address}"
+
+    # ──── POLICY 3: Severity-based approval ────
+    - rule_name: "critical_severity_auto_approve"
+      description: "Auto-approve if attack severity is critical and evidence is strong"
+      target_tool: "firewall_block_ip"
+      priority: 150
+      condition:
+        type: compound
+        operator: AND
+        conditions:
+          - field: "context.attack_severity"
+            operator: equals
+            value: "critical"
+          - field: "context.attack_count"
+            operator: greater_than
+            value: 10
+          - field: "context.attack_confidence"
+            operator: greater_than
+            value: 0.85
+      action: allow
+      audit:
+        level: info
+        message: "Auto-approved critical threat (attacks: {context.attack_count})"
+
+    # ──── POLICY 4: Time-based restrictions ────
+    - rule_name: "off_hours_escalation"
+      description: "Require manager approval during off-hours (10PM-6AM)"
+      target_tool: "firewall_block_ip"
+      priority: 50
+      condition:
+        type: expression
+        expression: |
+          context.current_hour < 6 OR context.current_hour > 22
+      action: require_approval
+      approval:
+        level: manager
+        timeout: 1800  # 30 minute timeout
+        escalation:
+          after: 900   # Escalate after 15 minutes
+          to: on_call_lead
+      message: "Off-hours operation requires manager approval"
+
+    # ──── POLICY 5: Geographic restrictions ────
+    - rule_name: "geo_based_auto_block"
+      description: "Auto-approve blocking IPs from high-risk countries"
+      target_tool: "firewall_block_ip"
+      priority: 90
+      condition:
+        type: expression
+        expression: |
+          context.geo_country in ["XX", "YY", "ZZ"] AND
+          context.attack_count > 3
+      action: allow
+      audit:
+        level: info
+        message: "Auto-approved: High-risk geo ({context.geo_country})"
+
+    # ──── POLICY 6: Default approval requirement ────
+    - rule_name: "default_human_approval"
+      description: "Default policy requiring human approval for IP blocking"
+      target_tool: "firewall_block_ip"
+      priority: 10  # Lowest priority - catches everything else
+      condition:
+        type: always
+      action: require_approval
+      approval:
+        level: operator
+        timeout: 3600  # 1 hour timeout
+        notification:
+          channels: [slack, email, dashboard]
+          template: "ip_block_approval_request"
+      message: "IP blocking requires explicit human approval per security policy"
+
+    # ──── POLICY 7: System lockdown - multi-level approval ────
+    - rule_name: "lockdown_multi_approval"
+      description: "System lockdown requires multiple approvals"
+      target_tool: "system_lockdown"
+      priority: 100
+      condition:
+        type: always
+      action: require_approval
+      approval:
+        type: multi_party
+        required_approvals: 2
+        approvers:
+          - role: security_lead
+          - role: ops_manager
+        timeout: 900  # 15 minutes for emergency
+        notification:
+          channels: [pagerduty, slack, sms]
+          urgency: critical
+      message: "CRITICAL: System lockdown requires 2 approvals (Security Lead + Ops Manager)"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ROLE-BASED ACCESS CONTROL
+  # ─────────────────────────────────────────────────────────────────────────────
+  rbac:
+    roles:
+      - name: operator
+        description: "SOC Level 1 Analyst"
+        permissions:
+          - tool: analyze_logs
+            action: allow
+          - tool: analyze_access_logs
+            action: allow
+          - tool: get_security_events
+            action: allow
+          - tool: get_blocked_ips
+            action: allow
+          - tool: firewall_block_ip
+            action: request_approval  # Can request, not execute
+          - tool: system_lockdown
+            action: deny
+
+      - name: analyst
+        description: "SOC Level 2 Analyst"
+        permissions:
+          - tool: "*"
+            action: allow
+          - tool: firewall_block_ip
+            action: allow
+            conditions:
+              max_blocks_per_hour: 5
+              require_justification: true
+          - tool: system_lockdown
+            action: request_approval
+
+      - name: security_lead
+        description: "Security Team Lead"
+        permissions:
+          - tool: "*"
+            action: allow
+          - tool: system_lockdown
+            action: allow
+            conditions:
+              require_incident_id: true
+
+      - name: admin
+        description: "Security Administrator"
+        permissions:
+          - tool: "*"
+            action: allow
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # AUDIT CONFIGURATION
+  # ─────────────────────────────────────────────────────────────────────────────
+  audit:
+    enabled: true
+    log_format: json
+    include_fields:
+      - timestamp
+      - tool_name
+      - parameters
+      - policy_evaluated
+      - decision
+      - user_role
+      - approval_id
+      - risk_score
+    destinations:
+      - type: file
+        path: /logs/archestra_audit.jsonl
+    retention:
+      days: 90
+      compliance_mode: true

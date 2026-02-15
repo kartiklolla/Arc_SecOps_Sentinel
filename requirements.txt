@@ -1,4 +1,4 @@
-# --- The Villain (Attacker Console) ---
+# --- The Attacker (Cyber Strike Console) ---
 textual>=0.75.0      # The TUI framework for the Matrix-style dashboard
 rich>=13.0.0         # For beautiful terminal formatting (logs/colors)
 
